@@ -31,33 +31,70 @@ function displayAnalysis(analysis) {
   }
   
   const content = document.getElementById('content');
-  content.innerHTML = `
-    <div class="likelihood-display ${likelihoodClass}">
-      <div class="likelihood-number">${likelihood}%</div>
-      <div class="likelihood-label">${likelihoodText}</div>
-    </div>
-    
-    <div class="details">
-      <div class="detail-item">
-        <span class="detail-label">Word Count:</span>
-        <span class="detail-value">${details.wordCount}</span>
+  
+  // Different display based on source (API vs heuristic)
+  if (details.source === 'api') {
+    content.innerHTML = `
+      <div class="likelihood-display ${likelihoodClass}">
+        <div class="likelihood-number">${likelihood}%</div>
+        <div class="likelihood-label">${likelihoodText}</div>
+        <div class="api-badge">✓ ${details.provider || 'API'}</div>
       </div>
-      <div class="detail-item">
-        <span class="detail-label">Phrase Score:</span>
-        <span class="detail-value">${Math.round(details.phraseScore)}%</span>
+      
+      <div class="details">
+        <div class="detail-item">
+          <span class="detail-label">Word Count:</span>
+          <span class="detail-value">${details.wordCount || 'N/A'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Generated Probability:</span>
+          <span class="detail-value">${Math.round((details.averageGeneratedProb || 0) * 100)}%</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Completely Generated:</span>
+          <span class="detail-value">${Math.round((details.completelyGeneratedProb || 0) * 100)}%</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Sentences Analysed:</span>
+          <span class="detail-value">${details.sentences || 'N/A'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Detection Source:</span>
+          <span class="detail-value">${details.provider || 'API'}</span>
+        </div>
       </div>
-      <div class="detail-item">
-        <span class="detail-label">Structure Score:</span>
-        <span class="detail-value">${Math.round(details.structureScore)}%</span>
+    `;
+  } else {
+    // Fallback heuristic display
+    content.innerHTML = `
+      <div class="likelihood-display ${likelihoodClass}">
+        <div class="likelihood-number">${likelihood}%</div>
+        <div class="likelihood-label">${likelihoodText}</div>
+        <div class="api-badge warning">⚠ Local Analysis</div>
       </div>
-      <div class="detail-item">
-        <span class="detail-label">Personality Score:</span>
-        <span class="detail-value">${Math.round(details.personalityScore)}%</span>
+      
+      <div class="details">
+        <div class="detail-item">
+          <span class="detail-label">Word Count:</span>
+          <span class="detail-value">${details.wordCount || 'N/A'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Avg Sentence Length:</span>
+          <span class="detail-value">${details.avgSentenceLength || 'N/A'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Sentences:</span>
+          <span class="detail-value">${details.sentenceCount || 'N/A'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Detection Source:</span>
+          <span class="detail-value">Local Heuristic</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Note:</span>
+          <span class="detail-value">API unavailable</span>
+        </div>
       </div>
-      <div class="detail-item">
-        <span class="detail-label">Repetition Score:</span>
-        <span class="detail-value">${Math.round(details.repetitionScore)}%</span>
-      </div>
-    </div>
-  `;
+    `;
+  }
 }

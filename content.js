@@ -1,94 +1,75 @@
 class AIContentDetector {
   constructor() {
-    this.aiIndicators = {
-      // Common AI-generated phrases
-      commonPhrases: [
-        'in conclusion',
-        'furthermore',
-        'moreover',
-        'however',
-        'it is important to note',
-        'it should be noted',
-        'as previously mentioned',
-        'in summary',
-        'to summarise',
-        'in today\'s digital age',
-        'in today\'s world',
-        'it\'s worth noting',
-        'delve into',
-        'multifaceted',
-        'comprehensive',
-        'holistic approach',
-        'myriad of',
-        'plethora of'
-      ],
-      
-      // Generic transition words that AI overuses
-      transitions: [
-        'additionally',
-        'consequently',
-        'therefore',
-        'thus',
-        'hence',
-        'accordingly',
-        'subsequently',
-        'nonetheless',
-        'nevertheless'
-      ],
-      
-      // Overly formal structures
-      formalStructures: [
-        /in the realm of/gi,
-        /it is imperative/gi,
-        /one must consider/gi,
-        /it is crucial to understand/gi,
-        /plays a pivotal role/gi,
-        /serves as a testament/gi,
-        /paramount importance/gi
-      ]
-    };
+    // Replace with your actual API key
+    this.apiKey = 'YOUR_API_KEY_HERE';
+    this.apiEndpoint = 'https://api.gptzero.me/v2/predict/text'; // GPTZero example
     
-    this.personalityIndicators = [
-      /\bi\s+think\b/gi,
-      /\bi\s+believe\b/gi,
-      /\bmy\s+experience\b/gi,
-      /\bwhen\s+i\b/gi,
-      /\bi\s+remember\b/gi,
-      /\byesterday\s+i\b/gi,
-      /\blast\s+week\s+i\b/gi
-    ];
+    // Fallback to heuristic if API fails
+    this.fallbackDetector = new HeuristicDetector();
   }
   
-  analyseContent() {
+  async analyseContent() {
     const textContent = this.extractTextContent();
+    
     if (textContent.length < 100) {
-      return { likelihood: 0, details: 'Content too short to analyse' };
+      return { likelihood: 0, details: 'Content too short to analyse', source: 'local' };
     }
     
-    const analysis = {
-      phraseScore: this.analysePhrases(textContent),
-      structureScore: this.analyseStructure(textContent),
-      personalityScore: this.analysePersonality(textContent),
-      repetitionScore: this.analyseRepetition(textContent),
-      lengthScore: this.analyseSentenceLength(textContent)
-    };
+    try {
+      // Try API first
+      const apiResult = await this.analyseWithAPI(textContent);
+      return apiResult;
+    } catch (error) {
+      console.warn('API analysis failed, falling back to heuristic:', error);
+      // Fallback to local heuristic analysis
+      const fallbackResult = this.fallbackDetector.analyseContent();
+      fallbackResult.source = 'heuristic_fallback';
+      return fallbackResult;
+    }
+  }
+  
+  async analyseWithAPI(text) {
+    // Limit text length to avoid API limits (adjust based on your chosen API)
+    const maxLength = 25000;
+    const analysisText = text.length > maxLength ? text.substring(0, maxLength) : text;
     
-    const weightedScore = (
-      analysis.phraseScore * 0.3 +
-      analysis.structureScore * 0.25 +
-      analysis.personalityScore * 0.2 +
-      analysis.repetitionScore * 0.15 +
-      analysis.lengthScore * 0.1
-    );
+    const response = await fetch(this.apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        document: analysisText,
+        version: '2024-01-09'  // GPTZero API version
+      })
+    });
     
-    const likelihood = Math.round(Math.min(100, Math.max(0, weightedScore)));
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Parse API response (format varies by provider)
+    return this.parseAPIResponse(data, text);
+  }
+  
+  parseAPIResponse(apiData, originalText) {
+    // GPTZero response format example
+    const likelihood = Math.round((apiData.documents[0]?.average_generated_prob || 0) * 100);
     
     return {
       likelihood,
       details: {
-        ...analysis,
-        totalScore: likelihood,
-        wordCount: textContent.split(/\s+/).length
+        averageGeneratedProb: apiData.documents[0]?.average_generated_prob || 0,
+        completelyGeneratedProb: apiData.documents[0]?.completely_generated_prob || 0,
+        overallBurstiness: apiData.documents[0]?.overall_burstiness || 0,
+        paragraphs: apiData.documents[0]?.paragraphs?.length || 0,
+        sentences: apiData.documents[0]?.sentences?.length || 0,
+        wordCount: originalText.split(/\s+/).length,
+        source: 'api',
+        provider: 'GPTZero'
       }
     };
   }
@@ -128,140 +109,115 @@ class AIContentDetector {
     
     return content.trim();
   }
-  
-  analysePhrases(text) {
-    const lowerText = text.toLowerCase();
-    let score = 0;
-    let totalMatches = 0;
-    
-    // Check for common AI phrases
-    this.aiIndicators.commonPhrases.forEach(phrase => {
-      const matches = (lowerText.match(new RegExp(phrase, 'g')) || []).length;
-      totalMatches += matches;
-      score += matches * 15;
-    });
-    
-    // Check for overuse of transitions
-    this.aiIndicators.transitions.forEach(transition => {
-      const matches = (lowerText.match(new RegExp(`\\b${transition}\\b`, 'g')) || []).length;
-      totalMatches += matches;
-      score += matches * 10;
-    });
-    
-    // Check for formal structures
-    this.aiIndicators.formalStructures.forEach(pattern => {
-      const matches = (text.match(pattern) || []).length;
-      totalMatches += matches;
-      score += matches * 20;
-    });
-    
-    // Normalise by text length
-    const wordsCount = text.split(/\s+/).length;
-    return Math.min(100, (score / wordsCount) * 1000);
-  }
-  
-  analyseStructure(text) {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    let score = 0;
-    
-    // Check for overly consistent sentence length
-    const lengths = sentences.map(s => s.trim().split(/\s+/).length);
-    const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-    const variance = lengths.reduce((acc, len) => acc + Math.pow(len - avgLength, 2), 0) / lengths.length;
-    
-    // Low variance suggests AI (too consistent)
-    if (variance < 20 && avgLength > 15) {
-      score += 30;
+}
+
+// Fallback heuristic detector (simplified version of original)
+class HeuristicDetector {
+  analyseContent() {
+    const textContent = this.extractTextContent();
+    if (textContent.length < 100) {
+      return { likelihood: 0, details: 'Content too short to analyse' };
     }
     
-    // Check for repetitive sentence starters
-    const starters = sentences.map(s => s.trim().split(/\s+/).slice(0, 2).join(' ').toLowerCase());
-    const starterCounts = {};
-    starters.forEach(starter => {
-      starterCounts[starter] = (starterCounts[starter] || 0) + 1;
-    });
+    // Simplified heuristic analysis
+    const wordCount = textContent.split(/\s+/).length;
+    const sentences = textContent.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    const avgSentenceLength = sentences.reduce((acc, s) => acc + s.split(/\s+/).length, 0) / sentences.length;
     
-    const repeatedStarters = Object.values(starterCounts).filter(count => count > 2).length;
-    score += repeatedStarters * 15;
+    // Basic scoring
+    let score = 0;
+    if (avgSentenceLength > 20 && avgSentenceLength < 35) score += 30;
+    if (textContent.toLowerCase().includes('furthermore')) score += 10;
+    if (textContent.toLowerCase().includes('however')) score += 10;
+    if (textContent.toLowerCase().includes('moreover')) score += 10;
     
-    return Math.min(100, score);
-  }
-  
-  analysePersonality(text) {
-    let personalityMarkers = 0;
-    
-    this.personalityIndicators.forEach(pattern => {
-      const matches = (text.match(pattern) || []).length;
-      personalityMarkers += matches;
-    });
-    
-    const wordsCount = text.split(/\s+/).length;
-    const personalityRatio = personalityMarkers / (wordsCount / 100);
-    
-    // Higher personality markers = less likely to be AI
-    return Math.max(0, 100 - (personalityRatio * 30));
-  }
-  
-  analyseRepetition(text) {
-    const words = text.toLowerCase().match(/\b\w{4,}\b/g) || [];
-    const wordCounts = {};
-    
-    words.forEach(word => {
-      wordCounts[word] = (wordCounts[word] || 0) + 1;
-    });
-    
-    let repetitionScore = 0;
-    const totalWords = words.length;
-    
-    Object.values(wordCounts).forEach(count => {
-      if (count > 3) {
-        repetitionScore += (count - 3) * 5;
+    return {
+      likelihood: Math.min(100, score),
+      details: {
+        wordCount,
+        avgSentenceLength: Math.round(avgSentenceLength),
+        sentenceCount: sentences.length,
+        source: 'heuristic'
       }
-    });
-    
-    return Math.min(100, (repetitionScore / totalWords) * 100);
+    };
   }
   
-  analyseSentenceLength(text) {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    const lengths = sentences.map(s => s.trim().split(/\s+/).length);
-    
-    if (lengths.length === 0) return 0;
-    
-    const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
-    
-    // AI tends to write moderately long, consistent sentences
-    if (avgLength > 20 && avgLength < 35) {
-      return 40;
-    }
-    
-    return 0;
+  extractTextContent() {
+    return document.body.innerText || '';
   }
 }
 
-// Run analysis when page loads
-function runAnalysis() {
-  const detector = new AIContentDetector();
-  const result = detector.analyseContent();
+// Configuration options
+const CONFIG = {
+  // Set your preferred API provider
+  provider: 'gptzero', // 'gptzero', 'originality', 'copyleaks', 'sapling'
   
-  // Send results to background script
-  chrome.runtime.sendMessage({
-    action: 'updateBadge',
-    likelihood: result.likelihood,
-    details: result.details
-  });
+  // API endpoints for different providers
+  endpoints: {
+    gptzero: 'https://api.gptzero.me/v2/predict/text',
+    originality: 'https://api.originality.ai/api/v1/scan/ai',
+    copyleaks: 'https://api.copyleaks.com/v2/writer-detector',
+    sapling: 'https://api.sapling.ai/api/v1/aidetect'
+  },
+  
+  // Rate limiting
+  maxRequestsPerMinute: 10,
+  requestCooldown: 6000 // 6 seconds between requests
+};
+
+// Rate limiting mechanism
+let lastRequestTime = 0;
+let requestCount = 0;
+
+async function runAnalysis() {
+  // Check rate limiting
+  const now = Date.now();
+  if (now - lastRequestTime < CONFIG.requestCooldown) {
+    console.log('Rate limit: waiting before next request');
+    return;
+  }
+  
+  if (requestCount >= CONFIG.maxRequestsPerMinute) {
+    console.log('Rate limit: too many requests per minute');
+    return;
+  }
+  
+  lastRequestTime = now;
+  requestCount++;
+  
+  // Reset counter every minute
+  setTimeout(() => { requestCount = Math.max(0, requestCount - 1); }, 60000);
+  
+  try {
+    const detector = new AIContentDetector();
+    const result = await detector.analyseContent();
+    
+    // Send results to background script
+    chrome.runtime.sendMessage({
+      action: 'updateBadge',
+      likelihood: result.likelihood,
+      details: result.details
+    });
+  } catch (error) {
+    console.error('Analysis failed:', error);
+  }
 }
 
 // Run analysis after a delay to ensure content is loaded
-setTimeout(runAnalysis, 2000);
+setTimeout(runAnalysis, 3000);
 
-// Also run when content changes (for SPAs)
+// Also run when content changes (for SPAs) - with debouncing
+let contentChangeTimeout;
 let lastContent = '';
+
 const observer = new MutationObserver(() => {
   const currentContent = document.body.innerText;
   if (currentContent !== lastContent && currentContent.length > 100) {
     lastContent = currentContent;
-    setTimeout(runAnalysis, 1000);
+    
+    // Debounce content changes
+    clearTimeout(contentChangeTimeout);
+    contentChangeTimeout = setTimeout(runAnalysis, 2000);
   }
 });
 

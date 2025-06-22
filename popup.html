@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <style>
     body {
-      width: 300px;
+      width: 320px;
       padding: 15px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
@@ -28,6 +28,7 @@
       border-radius: 10px;
       text-align: center;
       margin-bottom: 15px;
+      position: relative;
     }
     
     .likelihood-number {
@@ -39,6 +40,23 @@
     .likelihood-label {
       font-size: 14px;
       opacity: 0.9;
+    }
+    
+    .api-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+      backdrop-filter: blur(10px);
+    }
+    
+    .api-badge.warning {
+      background: rgba(255, 193, 7, 0.8);
+      color: #333;
     }
     
     .details {
@@ -61,11 +79,15 @@
     
     .detail-label {
       color: #666;
+      flex: 1;
     }
     
     .detail-value {
       font-weight: bold;
       color: #333;
+      text-align: right;
+      flex: 0 0 auto;
+      margin-left: 10px;
     }
     
     .status {
@@ -78,6 +100,38 @@
     .medium { background: linear-gradient(135deg, #ffa726, #fb8c00); }
     .low { background: linear-gradient(135deg, #ffeb3b, #f57f17); }
     .none { background: linear-gradient(135deg, #4caf50, #388e3c); }
+    
+    .footer {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 11px;
+      color: #888;
+    }
+    
+    .api-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      margin-top: 8px;
+      font-size: 11px;
+      opacity: 0.8;
+    }
+    
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4caf50;
+    }
+    
+    .status-dot.warning {
+      background: #ff9800;
+    }
+    
+    .status-dot.error {
+      background: #f44336;
+    }
   </style>
 </head>
 <body>
@@ -88,6 +142,13 @@
   <div id="content">
     <div class="status">
       Analysing current page...
+    </div>
+  </div>
+  
+  <div class="footer">
+    <div class="api-status">
+      <div class="status-dot"></div>
+      <span>Enhanced with AI Detection API</span>
     </div>
   </div>
   
